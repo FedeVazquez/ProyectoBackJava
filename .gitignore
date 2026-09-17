@@ -1,0 +1,20 @@
+# Eclipse
+.settings/
+.project
+.classpath
+.factorypath
+
+# Maven
+**/target/
+
+# Compilados
+*.class
+
+# Local
+*.log
+
+# H2 local
+data/
+*.db
+*.mv.db
+*.trace.db
