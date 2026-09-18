@@ -3,7 +3,7 @@
 Desafío profesional de la especialización Back-End de Digital House.
 Documento vivo: se actualiza al cerrar cada sesión de trabajo.
 
-**Última actualización:** 18/09/2026
+**Última actualización:** 18/09/2026 (sesión 3)
 
 ---
 
@@ -92,6 +92,30 @@ historial de Git con configuración local.
 Los proyectos se crean con **"Use default location" destildado**, apuntando la ruta
 dentro del repo.
 
+### Preparar otra máquina (checklist)
+
+Todo esto se configura una vez por máquina; no viaja con el repo.
+
+1. **JDK 21** (Temurin): `winget install EclipseAdoptium.Temurin.21.JDK`.
+   `JAVA_HOME` apuntando a la carpeta del JDK (sin `in`) y ese `in` primero en el `Path`.
+   Verificar en una terminal **nueva**: `java -version` → 21. Las terminales/apps abiertas
+   antes del cambio siguen viendo los valores viejos: hay que cerrarlas y reabrirlas.
+2. **Lombok en Eclipse.** Maven lo usa solo, pero el compilador de Eclipse no: sin esto
+   aparecen errores tipo *"The method getEmail() is undefined"*. Con Eclipse cerrado:
+   `java -jar ~/.m2/repository/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar`
+   → elegir el `eclipse.exe` → Install/Update → abrir Eclipse → Project → Clean.
+   (El jar aparece en `~/.m2` después del primer build de Maven: `./mvnw compile`.)
+3. **Importar el proyecto:** File → Import → Maven → Existing Maven Projects → carpeta
+   `users-service`. Después **Alt+F5** (Maven → Update Project).
+4. **X rojas en el `pom.xml`** de "Language Servers" (*cvc-elt.1.a* / *Downloading external
+   resources is disabled*): no son errores de Maven. Window → Preferences → XML (Wild Web
+   Developer) → tildar "Download external resources…". Alternativa: Validation & Resolution
+   → schema based validation = `Never`. No tildar "Allow resolution of external entities".
+5. **Base H2:** vive en `users-service/data/` y está en `.gitignore`, así que en otra máquina
+   arranca vacía. Hibernate crea la tabla sola al levantar la app.
+6. Correr: Boot Dashboard → `users-service` → (Re)start. Tiene que terminar en
+   `Started UsersServiceApplication` y `Tomcat started on port 8081`.
+
 ---
 
 ## 5. Estado actual
@@ -110,19 +134,55 @@ dentro del repo.
 - [x] Entidad `User` (tabla `users`, `dni` y `email` únicos)
 - [x] Interfaz `UserRepository` (`findByEmail`, `existsByEmail`, `existsByDni`)
 - [x] DTOs `RegisterUserRequest` (con validaciones) y `UserResponse` (sin contraseña, con CVU y alias) en `com.dmh.users.dto`
+- [x] `@Size(max)` del DTO alineados con los `length` de la entidad (nombre y apellido 100, email 254, contraseña 8–72)
+- [x] La app arranca y Hibernate crea la tabla `users`
+- [x] `spring-security-crypto` + `SecurityConfig` con el bean `PasswordEncoder` (BCrypt)
+- [x] `UserAlreadyExistsException` (unchecked, en `exception`)
+- [x] `UserService.register`: normaliza email, chequea email/DNI duplicados, hashea la contraseña, guarda y devuelve `UserResponse` (`cvu`/`alias` en `null` por ahora)
+- [x] `UserController` → `POST /users` con `@Valid`, responde 201
 
 ### En curso — Sprint 1
 
-- [x] Alinear los `@Size(max)` del DTO con los `length` de la entidad (nombre y apellido 100, email 254)
-- [ ] Verificar que la app arranca y Hibernate crea la tabla
-- [ ] Pasar de H2 a MySQL (`dmh_users`)
+- [ ] **Probar `POST /users` con Postman** (ver "Próximo paso" abajo)
+- [ ] **Manejo de errores** con `@RestControllerAdvice`
 
-### Próximo
+### Próximo paso concreto
 
-- [ ] `UserService` con la lógica
-- [ ] `UserController` → `POST /users`
+**1. Probar el registro.** POST `http://localhost:8081/users`, Body → raw → JSON:
+
+```json
+{
+  "name": "Federico",
+  "lastName": "Vazquez",
+  "dni": "12345678",
+  "email": "Fede@Mail.com",
+  "phoneNumber": "1144445555",
+  "password": "clave1234"
+}
+```
+
+| Prueba | Esperado hoy |
+|---|---|
+| Mandarlo tal cual | 201, email en minúsculas, `cvu`/`alias` en `null`, sin `password` |
+| Mandarlo otra vez | 500 (la `UserAlreadyExistsException` todavía no se traduce) |
+| `"dni": "123"` | 400 genérico de Spring, sin el mensaje propio |
+
+**2. `GlobalExceptionHandler`** en `com.dmh.users.exception`, con `@RestControllerAdvice`:
+
+- `MethodArgumentNotValidException` (falla de `@Valid`) → 400 con el mensaje de cada campo
+- `UserAlreadyExistsException` → 400 (la consigna solo admite 400/500/201 en el registro)
+- `DataIntegrityViolationException` (dos registros simultáneos que pasan el `exists` y
+  choca el `unique` de la base) → 400
+- `Exception` genérica → 500 con un mensaje neutro, sin stack trace
+
+Después de eso, repetir las tres pruebas: 201, 400 con mensaje, 400 con mensaje.
+
+### Después
+
 - [ ] Generación de CVU (22 dígitos) y alias (3 palabras desde un TXT)
-- [ ] Probar con Postman
+- [ ] Login (JWT) y logout
+- [ ] Pasar de H2 a MySQL (`dmh_users`)
+- [ ] Eureka + Gateway, y separar `accounts-service` (CVU/alias viven ahí, se piden por Feign)
 
 ---
 
@@ -201,6 +261,11 @@ Más un **documento de proyecto** con:
 | `ddl-auto=update` | Hibernate crea las tablas solo mientras se desarrolla. **Solo para desarrollo** — en producción nunca |
 | H2 en archivo antes que MySQL | Permite avanzar con entidad/repositorio sin depender de tener MySQL levantado. La config de MySQL queda comentada en `application.properties` para el cambio |
 | Todo el código bajo `com.dmh.users` | Es el paquete de `UsersServiceApplication`; lo que quede fuera no lo encuentra el component scan |
+| `spring-security-crypto` y no el starter de Security | Trae solo BCrypt. El starter completo bloquea todos los endpoints; se suma con el JWT |
+| Duplicados de email/DNI → 400 | La consigna solo lista 400, 500 y 201 para el registro |
+| Email normalizado (`trim` + minúsculas) antes de validar y guardar | El `unique` de la base compara texto exacto: `Juan@Mail.com` y `juan@mail.com` serían dos usuarios |
+| Inyección por constructor (`@RequiredArgsConstructor` + campos `final`) | Dependencias explícitas e inmutables; se puede instanciar en tests sin levantar Spring |
+| Límites de texto definidos en la entidad y repetidos en el DTO | Si solo están en la base, un dato largo da 500; con `@Size` da 400 con mensaje |
 | `show-sql=true` mientras se aprende | Ver el SQL que genera el ORM es la mejor forma de entender qué hace por detrás |
 | GitHub para trabajar, GitLab para entregar | Git maneja varios remotos: `git remote add gitlab <url>` y `git push gitlab main` al momento de la entrega |
 
@@ -227,3 +292,15 @@ Más un **documento de proyecto** con:
 - **Trabas:** los DTOs quedaron en `com.dmh.user.dto` (sin "s"); se movieron a `com.dmh.users.dto`.
 - **Aprendido:** las validaciones del DTO tienen que acompañar las restricciones de la
   entidad; si no, un dato inválido llega a la base y devuelve 500 en lugar de 400.
+
+### 18/09/2026 — Sesión 3
+
+- **Hecho:** límites de tamaño alineados entre DTO y entidad, `SecurityConfig` con BCrypt,
+  `UserAlreadyExistsException`, `UserService.register` y `UserController` (`POST /users`).
+  Se agregó `CLAUDE.md` con las reglas para trabajar con Claude.
+- **Trabas:** Lombok no estaba instalado en Eclipse (Maven compilaba, Eclipse no veía los
+  getters); `JAVA_HOME` que no se actualizaba en terminales ya abiertas; falsos errores del
+  validador XML en el `pom.xml`; `application.properties` guardado en Windows-1252 rompía Maven.
+- **Aprendido:** `@Bean` usa el nombre del método como nombre del bean (va en camelCase);
+  sin `@Valid` las validaciones del DTO no corren; Eclipse deja ejecutar con errores de
+  compilación, así que hay que mirar la vista Problems antes de dar algo por andando.
