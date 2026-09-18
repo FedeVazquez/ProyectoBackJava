@@ -3,7 +3,7 @@
 Desafío profesional de la especialización Back-End de Digital House.
 Documento vivo: se actualiza al cerrar cada sesión de trabajo.
 
-**Última actualización:** 15/09/2026
+**Última actualización:** 18/09/2026
 
 ---
 
@@ -25,7 +25,7 @@ El front-end lo provee Digital House ya hecho; el trabajo es exponer la API que 
 | Área | Tecnología |
 |---|---|
 | Lenguaje | Java 21 (LTS) |
-| Framework | Spring Boot |
+| Framework | Spring Boot 4.1.1 |
 | Persistencia | Spring Data JPA + Hibernate |
 | Base de datos | MySQL |
 | Autenticación | JWT |
@@ -105,18 +105,20 @@ dentro del repo.
 - [x] Dependencias: Spring Web, Spring Data JPA, MySQL Driver, Lombok, Validation
 - [x] `.gitignore` en la raíz del repo
 - [x] Primer commit pusheado
+- [x] `application.properties` configurado (H2 en archivo por ahora + Hibernate)
+- [x] `docker-compose.yml` subido al repo
+- [x] Entidad `User` (tabla `users`, `dni` y `email` únicos)
+- [x] Interfaz `UserRepository` (`findByEmail`, `existsByEmail`, `existsByDni`)
+- [x] DTOs `RegisterUserRequest` (con validaciones) y `UserResponse` (sin contraseña, con CVU y alias) en `com.dmh.users.dto`
 
-### En curso — Sprint 1, sesión 1
+### En curso — Sprint 1
 
-- [ ] Crear base `dmh_users` en MySQL
-- [ ] Configurar `application.properties` (datasource + Hibernate)
-- [ ] Entidad `User`
-- [ ] Interfaz `UserRepository`
+- [x] Alinear los `@Size(max)` del DTO con los `length` de la entidad (nombre y apellido 100, email 254)
 - [ ] Verificar que la app arranca y Hibernate crea la tabla
+- [ ] Pasar de H2 a MySQL (`dmh_users`)
 
 ### Próximo
 
-- [ ] DTO de registro con validaciones (`@Valid`)
 - [ ] `UserService` con la lógica
 - [ ] `UserController` → `POST /users`
 - [ ] Generación de CVU (22 dígitos) y alias (3 palabras desde un TXT)
@@ -197,6 +199,8 @@ Más un **documento de proyecto** con:
 | Workspace de Eclipse fuera del repo | Evita que `.metadata` y la configuración local ensucien el historial |
 | Sin Spring Security al inicio | Agregada de entrada bloquea todos los endpoints con un login automático y confunde el debug. Se suma al implementar el JWT |
 | `ddl-auto=update` | Hibernate crea las tablas solo mientras se desarrolla. **Solo para desarrollo** — en producción nunca |
+| H2 en archivo antes que MySQL | Permite avanzar con entidad/repositorio sin depender de tener MySQL levantado. La config de MySQL queda comentada en `application.properties` para el cambio |
+| Todo el código bajo `com.dmh.users` | Es el paquete de `UsersServiceApplication`; lo que quede fuera no lo encuentra el component scan |
 | `show-sql=true` mientras se aprende | Ver el SQL que genera el ORM es la mejor forma de entender qué hace por detrás |
 | GitHub para trabajar, GitLab para entregar | Git maneja varios remotos: `git remote add gitlab <url>` y `git push gitlab main` al momento de la entrega |
 
@@ -215,3 +219,11 @@ Más un **documento de proyecto** con:
   Se resolvió separándolos físicamente.
 - **Aprendido:** los plugins del Marketplace se instalan en la instalación de Eclipse,
   no en el workspace — sobreviven a cambiar de workspace o borrar proyectos.
+
+### 16–17/09/2026 — Sesión 2
+
+- **Hecho:** `docker-compose.yml`, entidad `User`, `UserRepository` y los primeros DTOs
+  (`RegisterUserRequest`, `UserResponse`). Se usa H2 en archivo mientras no esté MySQL.
+- **Trabas:** los DTOs quedaron en `com.dmh.user.dto` (sin "s"); se movieron a `com.dmh.users.dto`.
+- **Aprendido:** las validaciones del DTO tienen que acompañar las restricciones de la
+  entidad; si no, un dato inválido llega a la base y devuelve 500 en lugar de 400.

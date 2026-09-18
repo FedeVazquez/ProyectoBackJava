@@ -1,4 +1,4 @@
-package com.dmh.user.dto;
+package com.dmh.users.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
