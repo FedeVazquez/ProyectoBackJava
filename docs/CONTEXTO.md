@@ -3,7 +3,7 @@
 Desafío profesional de la especialización Back-End de Digital House.
 Documento vivo: se actualiza al cerrar cada sesión de trabajo.
 
-**Última actualización:** 18/09/2026 (sesión 3)
+**Última actualización:** 18/09/2026 (sesión 4)
 
 ---
 
@@ -84,6 +84,7 @@ independientes. Es lo que permite, por ejemplo, no devolver nunca la contraseña
 | Repositorio local | `C:\Users\Desarrollo\Desktop\ProyectoBackJava` |
 | Remoto | GitHub (repo personal) |
 | Instalado | Docker Desktop, MySQL, Git, Postman |
+| Segunda PC | Repo en `D:\ProyectoBackJava`, Eclipse en `D:\eclipse\eclipse` |
 
 **El workspace está fuera del repo a propósito.** El workspace es el cuaderno de notas
 del IDE (`.metadata`, preferencias); el repo es solo código. Mezclarlos ensucia el
@@ -96,25 +97,58 @@ dentro del repo.
 
 Todo esto se configura una vez por máquina; no viaja con el repo.
 
-1. **JDK 21** (Temurin): `winget install EclipseAdoptium.Temurin.21.JDK`.
-   `JAVA_HOME` apuntando a la carpeta del JDK (sin `in`) y ese `in` primero en el `Path`.
+1. **JDK 21** (Temurin), en Git Bash:
+   `winget install --id EclipseAdoptium.Temurin.21.JDK -e --accept-package-agreements --accept-source-agreements`.
+   Los flags `--accept-*` son necesarios: en Git Bash (MinTTY) winget no recibe el `Y` del
+   prompt interactivo y parece colgado. Alternativa: correr el mismo comando en PowerShell/cmd.
+   `JAVA_HOME` apuntando a la carpeta del JDK (sin `bin`) y ese `bin` primero en el `Path`.
    Verificar en una terminal **nueva**: `java -version` → 21. Las terminales/apps abiertas
    antes del cambio siguen viendo los valores viejos: hay que cerrarlas y reabrirlas.
+   - **Registrarlo en Eclipse** (no lo toma solo): Window → Preferences → Java → Installed JREs
+     → Add → Standard VM → carpeta del JDK 21. Después, en **Execution Environments** →
+     `JavaSE-21` → tildar ese JDK. Si no, `JavaSE-21` se resuelve contra cualquier otro JDK de
+     la máquina (pasó con el 25) y el log dice *"using Java 25"* aunque el proyecto pida 21.
+     Verificar en el arranque: `Starting UsersServiceApplication using Java 21...`.
+   - Los comandos de este documento son sintaxis **Git Bash** (`~`, `$VAR`). En PowerShell la
+     ruta al home es `$env:USERPROFILE`; pegar esa sintaxis en Git Bash da *"Unable to access
+     jarfile :USERPROFILE..."*.
 2. **Lombok en Eclipse.** Maven lo usa solo, pero el compilador de Eclipse no: sin esto
-   aparecen errores tipo *"The method getEmail() is undefined"*. Con Eclipse cerrado:
+   aparecen errores tipo *"The method getEmail() is undefined"* y *"The blank final field
+   ... may not have been initialized"* (esto último es `@RequiredArgsConstructor` sin procesar).
+   Con Eclipse cerrado:
    `java -jar ~/.m2/repository/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar`
-   → elegir el `eclipse.exe` → Install/Update → abrir Eclipse → Project → Clean.
+   → elegir el `eclipse.exe` (lo detecta solo; si no, "Specify location") → Install/Update →
+   abrir Eclipse → Project → Clean. Resultado esperado: Problems en 0 errores.
    (El jar aparece en `~/.m2` después del primer build de Maven: `./mvnw compile`.)
 3. **Importar el proyecto:** File → Import → Maven → Existing Maven Projects → carpeta
    `users-service`. Después **Alt+F5** (Maven → Update Project).
+   Para abrir Properties: un solo clic sobre el nodo raíz del proyecto → clic derecho →
+   Properties (o **Alt+Enter**).
 4. **X rojas en el `pom.xml`** de "Language Servers" (*cvc-elt.1.a* / *Downloading external
    resources is disabled*): no son errores de Maven. Window → Preferences → XML (Wild Web
    Developer) → tildar "Download external resources…". Alternativa: Validation & Resolution
    → schema based validation = `Never`. No tildar "Allow resolution of external entities".
 5. **Base H2:** vive en `users-service/data/` y está en `.gitignore`, así que en otra máquina
    arranca vacía. Hibernate crea la tabla sola al levantar la app.
-6. Correr: Boot Dashboard → `users-service` → (Re)start. Tiene que terminar en
+6. **Spring Tools 4** (da el Boot Dashboard): Help → Eclipse Marketplace → buscar "Spring Tools 4"
+   → Install → reiniciar Eclipse. Sin el plugin, Window → Show View → Other → "boot" no muestra
+   nada. Es una vista, se abre en Window → Show View → Other → Spring → Boot Dashboard.
+7. Correr: Boot Dashboard → `users-service` → (Re)start. Sin el plugin también anda: clic derecho
+   sobre `UsersServiceApplication` → Run As → Java Application. Tiene que terminar en
    `Started UsersServiceApplication` y `Tomcat started on port 8081`.
+8. **Autocompletado:** Ctrl+Space siempre funciona. Para que aparezca solo al escribir:
+   Window → Preferences → Java → Editor → Content Assist → "Enable auto activation" y, en
+   "Auto activation triggers for Java", agregar las letras (`.abcdefghijklmnopqrstuvwxyz`).
+
+### Problemas conocidos
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| `getX()` / `setX()` "undefined", "blank final field" | Lombok no instalado en Eclipse | Paso 2 |
+| Log dice `using Java 25` pero el proyecto pide 21 | `JavaSE-21` sin JDK 21 asociado en Eclipse | Paso 1 (registrar el JDK) |
+| `winget` no reacciona al `Y` en Git Bash | MinTTY no maneja el prompt de winget | Flags `--accept-*` o PowerShell |
+| 400 genérico (`timestamp/status/error/path`) sin detalle | Falló una validación del DTO (ej. DNI de 9 dígitos con `\d{7,8}`) o el body llegó vacío/roto | Con `GlobalExceptionHandler` ya devuelve `errors` por campo |
+| Warning *Build path entry is missing: src/test/resources* | La carpeta no existe todavía | Crearla al armar los tests de integración |
 
 ---
 
@@ -140,46 +174,42 @@ Todo esto se configura una vez por máquina; no viaja con el repo.
 - [x] `UserAlreadyExistsException` (unchecked, en `exception`)
 - [x] `UserService.register`: normaliza email, chequea email/DNI duplicados, hashea la contraseña, guarda y devuelve `UserResponse` (`cvu`/`alias` en `null` por ahora)
 - [x] `UserController` → `POST /users` con `@Valid`, responde 201
+- [x] `POST /users` probado en Postman: 201, duplicado, DNI inválido (todo verificado)
+- [x] `ErrorResponse` (record: `status`, `message`, `errors`) y `GlobalExceptionHandler` con `@RestControllerAdvice`
+- [x] Entorno de la segunda PC armado: Lombok en Eclipse, JDK 21 registrado, autocompletado
 
 ### En curso — Sprint 1
 
-- [ ] **Probar `POST /users` con Postman** (ver "Próximo paso" abajo)
-- [ ] **Manejo de errores** con `@RestControllerAdvice`
+- [ ] **Generación de CVU y alias** (ver "Próximo paso" abajo)
 
 ### Próximo paso concreto
 
-**1. Probar el registro.** POST `http://localhost:8081/users`, Body → raw → JSON:
+**Generar CVU y alias** dentro de `users-service` (hoy vuelven en `null`). Por ahora viven acá;
+cuando se separe `accounts-service` se mueven allá.
 
-```json
-{
-  "name": "Federico",
-  "lastName": "Vazquez",
-  "dni": "12345678",
-  "email": "Fede@Mail.com",
-  "phoneNumber": "1144445555",
-  "password": "clave1234"
-}
-```
+- **CVU:** 22 dígitos numéricos aleatorios, único
+- **Alias:** 3 palabras separadas por punto, elegidas al azar de un TXT en `src/main/resources`, único
+- Guardarlos en la entidad `User` y devolverlos en `UserResponse`
 
-| Prueba | Esperado hoy |
-|---|---|
-| Mandarlo tal cual | 201, email en minúsculas, `cvu`/`alias` en `null`, sin `password` |
-| Mandarlo otra vez | 500 (la `UserAlreadyExistsException` todavía no se traduce) |
-| `"dni": "123"` | 400 genérico de Spring, sin el mensaje propio |
+Prueba: `POST /users` → 201 con `cvu` de 22 dígitos y `alias` tipo `palabra.palabra.palabra`.
 
-**2. `GlobalExceptionHandler`** en `com.dmh.users.exception`, con `@RestControllerAdvice`:
+### Contrato de errores del registro (ya implementado)
 
-- `MethodArgumentNotValidException` (falla de `@Valid`) → 400 con el mensaje de cada campo
-- `UserAlreadyExistsException` → 400 (la consigna solo admite 400/500/201 en el registro)
-- `DataIntegrityViolationException` (dos registros simultáneos que pasan el `exists` y
-  choca el `unique` de la base) → 400
-- `Exception` genérica → 500 con un mensaje neutro, sin stack trace
+Todos los errores devuelven `{ "status", "message", "errors" }`:
 
-Después de eso, repetir las tres pruebas: 201, 400 con mensaje, 400 con mensaje.
+| Caso | Status | Detalle |
+|---|---|---|
+| Falla `@Valid` | 400 | `errors` = `campo → mensaje` (todos los campos inválidos juntos) |
+| Body vacío o JSON roto | 400 | `HttpMessageNotReadableException` |
+| Email o DNI duplicado | 400 | `UserAlreadyExistsException` (o `DataIntegrityViolationException` en la carrera) |
+| Cualquier otra excepción | 500 | Mensaje neutro; el stack trace queda solo en el log |
+
+Limitación conocida: el catch-all `Exception` convierte también un 405 (método no permitido) o
+un 415 (Content-Type incorrecto) en 500. Se corrige más adelante extendiendo
+`ResponseEntityExceptionHandler`.
 
 ### Después
 
-- [ ] Generación de CVU (22 dígitos) y alias (3 palabras desde un TXT)
 - [ ] Login (JWT) y logout
 - [ ] Pasar de H2 a MySQL (`dmh_users`)
 - [ ] Eureka + Gateway, y separar `accounts-service` (CVU/alias viven ahí, se piden por Feign)
@@ -268,6 +298,10 @@ Más un **documento de proyecto** con:
 | Límites de texto definidos en la entidad y repetidos en el DTO | Si solo están en la base, un dato largo da 500; con `@Size` da 400 con mensaje |
 | `show-sql=true` mientras se aprende | Ver el SQL que genera el ORM es la mejor forma de entender qué hace por detrás |
 | GitHub para trabajar, GitLab para entregar | Git maneja varios remotos: `git remote add gitlab <url>` y `git push gitlab main` al momento de la entrega |
+| `ErrorResponse` como `record` con `status`, `message` y `errors` | Un solo formato de error para toda la API; el record es inmutable y no necesita Lombok |
+| `errors` como mapa `campo → mensaje`, con `toMap` y función de merge | Un campo con dos violaciones repite la clave y `toMap` sin merge lanza `IllegalStateException` |
+| Handler propio de `HttpMessageNotReadableException` | Con un catch-all `Exception`, un body vacío o un JSON roto pasaría de 400 a 500 |
+| Excepciones inesperadas: mensaje neutro al cliente, stack trace al log (`@Slf4j`) | No filtrar detalles internos por HTTP y conservar la traza para depurar |
 
 ---
 
@@ -304,3 +338,16 @@ Más un **documento de proyecto** con:
 - **Aprendido:** `@Bean` usa el nombre del método como nombre del bean (va en camelCase);
   sin `@Valid` las validaciones del DTO no corren; Eclipse deja ejecutar con errores de
   compilación, así que hay que mirar la vista Problems antes de dar algo por andando.
+
+### 18/09/2026 — Sesión 4
+
+- **Hecho:** entorno de la segunda PC armado (Lombok, JDK 21 registrado en Eclipse, autocompletado);
+  `POST /users` probado en Postman; `ErrorResponse` y `GlobalExceptionHandler` (400 con detalle por
+  campo, 400 para duplicados y body roto, 500 neutro). Se documentaron los "Problemas conocidos".
+- **Trabas:** `winget` colgado en Git Bash (no recibe el `Y`); sintaxis de PowerShell pegada en Git
+  Bash (`$env:USERPROFILE`); el proyecto corría con Java 25 porque `JavaSE-21` no tenía un JDK 21
+  asociado; un 400 "misterioso" que era un DNI de 9 dígitos contra `\d{7,8}`; errores de tipeo
+  (`getFieldError()` vs `getFieldErrors()`) y un método helper faltante.
+- **Aprendido:** un execution environment de Eclipse es una especificación, no un JDK; sin `@ControllerAdvice`
+  el mensaje propio de una validación nunca llega al cliente; un catch-all `Exception` también atrapa
+  errores que Spring maneja bien (405/415) y los vuelve 500; guardar con Ctrl+S antes de reiniciar.

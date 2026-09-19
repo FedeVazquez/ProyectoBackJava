@@ -49,7 +49,9 @@ X") antes que tres features juntas.
 - **IDE: Eclipse** con Spring Tools 4. No sugieras atajos ni funciones de IntelliJ.
   Si mencionás un atajo, que sea el de Eclipse.
 - **Java 21**, Maven, Windows.
-- **Terminal: Git Bash.** Los comandos que me pases tienen que funcionar ahí.
+- **Terminal: Git Bash.** Los comandos que me pases tienen que funcionar ahí: sintaxis bash
+  (`~`, `$VAR`), nunca la de PowerShell (`$env:X`). `winget` va con `--accept-package-agreements
+  --accept-source-agreements`, porque en Git Bash no recibe el `Y` del prompt.
 - Base de datos: **H2 en modo archivo** temporalmente. MySQL en Docker queda pendiente
   porque la máquina de trabajo no tiene virtualización habilitada. El código no debe
   depender de cuál de las dos esté activa.
