@@ -3,7 +3,7 @@
 Desafío profesional de la especialización Back-End de Digital House.
 Documento vivo: se actualiza al cerrar cada sesión de trabajo.
 
-**Última actualización:** 18/09/2026 (sesión 4)
+**Última actualización:** 19/09/2026 (sesión 5)
 
 ---
 
@@ -149,6 +149,8 @@ Todo esto se configura una vez por máquina; no viaja con el repo.
 | `winget` no reacciona al `Y` en Git Bash | MinTTY no maneja el prompt de winget | Flags `--accept-*` o PowerShell |
 | 400 genérico (`timestamp/status/error/path`) sin detalle | Falló una validación del DTO (ej. DNI de 9 dígitos con `\d{7,8}`) o el body llegó vacío/roto | Con `GlobalExceptionHandler` ya devuelve `errors` por campo |
 | Warning *Build path entry is missing: src/test/resources* | La carpeta no existe todavía | Crearla al armar los tests de integración |
+| Se agrega una columna `not null` y el `alter table` falla en el log; el siguiente POST da 500 | `ddl-auto=update` no puede agregar una columna obligatoria a una tabla que ya tiene filas | Parar la app, borrar `users-service/data/` (está en `.gitignore`) y volver a arrancar: Hibernate recrea la tabla |
+| Un campo nuevo se guarda en la base pero vuelve `null` por HTTP | El mapeo a DTO no se actualizó (ej. `toResponse` con `null` hardcodeado) | Revisar el mapeo entidad → DTO, no la entidad |
 
 ---
 
@@ -172,26 +174,39 @@ Todo esto se configura una vez por máquina; no viaja con el repo.
 - [x] La app arranca y Hibernate crea la tabla `users`
 - [x] `spring-security-crypto` + `SecurityConfig` con el bean `PasswordEncoder` (BCrypt)
 - [x] `UserAlreadyExistsException` (unchecked, en `exception`)
-- [x] `UserService.register`: normaliza email, chequea email/DNI duplicados, hashea la contraseña, guarda y devuelve `UserResponse` (`cvu`/`alias` en `null` por ahora)
+- [x] `UserService.register`: normaliza email, chequea email/DNI duplicados, hashea la contraseña, guarda y devuelve `UserResponse`
 - [x] `UserController` → `POST /users` con `@Valid`, responde 201
 - [x] `POST /users` probado en Postman: 201, duplicado, DNI inválido (todo verificado)
 - [x] `ErrorResponse` (record: `status`, `message`, `errors`) y `GlobalExceptionHandler` con `@RestControllerAdvice`
 - [x] Entorno de la segunda PC armado: Lombok en Eclipse, JDK 21 registrado, autocompletado
+- [x] Campos `cvu` y `alias` en `User` (`not null` + `unique`), con `existsByCvu`/`existsByAlias` en el repositorio
+- [x] `aliases.txt` (60 palabras, sin acentos ni ñ) en `src/main/resources`
+- [x] `AccountDataGenerator` (`@Component`): CVU de 22 dígitos con `SecureRandom`; alias de 3 palabras distintas (`shuffle` + `subList`); el TXT se lee una sola vez al arrancar
+- [x] `UserService.register` asigna CVU y alias únicos (genera, chequea contra la base y reintenta, con tope de 10)
+- [x] `POST /users` devuelve `cvu` de 22 dígitos y `alias` de 3 palabras (verificado en Postman)
+- [x] Tests unitarios en verde: `AccountDataGeneratorTest` (3) y `UserServiceTest` con Mockito (3)
 
 ### En curso — Sprint 1
 
-- [ ] **Generación de CVU y alias** (ver "Próximo paso" abajo)
+- [ ] **Login (JWT) y logout** (ver "Próximo paso" abajo)
 
 ### Próximo paso concreto
 
-**Generar CVU y alias** dentro de `users-service` (hoy vuelven en `null`). Por ahora viven acá;
-cuando se separe `accounts-service` se mueven allá.
+**Login y logout con JWT.** Es el paso donde recién se suma `spring-boot-starter-security`
+(hasta ahora solo estaba `spring-security-crypto` para BCrypt) más una librería de JWT.
+Conviene partirlo en pasos chicos y verificables, no de una sola vez.
 
-- **CVU:** 22 dígitos numéricos aleatorios, único
-- **Alias:** 3 palabras separadas por punto, elegidas al azar de un TXT en `src/main/resources`, único
-- Guardarlos en la entidad `User` y devolverlos en `UserResponse`
+Requisitos de la consigna:
 
-Prueba: `POST /users` → 201 con `cvu` de 22 dígitos y `alias` tipo `palabra.palabra.palabra`.
+| Endpoint | Entrada | Salida | Errores |
+|---|---|---|---|
+| Login | email, contraseña | JSON con el token | 404 usuario inexistente, 400 contraseña incorrecta, 500 |
+| Logout | token en el header | — | 200, 500 |
+
+- La contraseña se verifica con `passwordEncoder.matches(plana, hash)`; nunca se compara texto plano
+- El token tiene que sobrevivir a un refresh de la página (no desloguear)
+- Al sumar el starter de Security, `POST /users` queda bloqueado si no se abre explícitamente
+  en `SecurityConfig`: es el primer síntoma esperable
 
 ### Contrato de errores del registro (ya implementado)
 
@@ -210,9 +225,18 @@ un 415 (Content-Type incorrecto) en 500. Se corrige más adelante extendiendo
 
 ### Después
 
-- [ ] Login (JWT) y logout
+- [ ] Tests de integración con RestAssured sobre `POST /users` (hoy los tests son solo unitarios)
 - [ ] Pasar de H2 a MySQL (`dmh_users`)
 - [ ] Eureka + Gateway, y separar `accounts-service` (CVU/alias viven ahí, se piden por Feign)
+
+### Límites conocidos de CVU y alias
+
+- Las 60 palabras de `aliases.txt` dan unas 200 mil combinaciones de 3. Alcanza para el MVP;
+  si hiciera falta más, se agregan palabras al TXT.
+- Si dos registros simultáneos generan el mismo alias, los dos pasan el `existsByAlias` y el
+  segundo choca contra el `unique`. Cae en el handler de `DataIntegrityViolationException`, que
+  responde "El email o el DNI ya están registrados": mensaje engañoso para ese caso. Muy
+  improbable, no se resuelve por ahora.
 
 ---
 
@@ -302,6 +326,15 @@ Más un **documento de proyecto** con:
 | `errors` como mapa `campo → mensaje`, con `toMap` y función de merge | Un campo con dos violaciones repite la clave y `toMap` sin merge lanza `IllegalStateException` |
 | Handler propio de `HttpMessageNotReadableException` | Con un catch-all `Exception`, un body vacío o un JSON roto pasaría de 400 a 500 |
 | Excepciones inesperadas: mensaje neutro al cliente, stack trace al log (`@Slf4j`) | No filtrar detalles internos por HTTP y conservar la traza para depurar |
+| CVU y alias generados en `users-service` por ahora | Su lugar definitivo es `accounts-service`, pero ese servicio todavía no existe. Se mueven al separarlo |
+| CVU como `String` y no `Long` | 22 dígitos no entran en un `Long` y así se conservan los ceros a la izquierda |
+| `SecureRandom` en vez de `Random` | `Random` es predecible conociendo su semilla; un CVU adivinable no es aceptable en una billetera |
+| El alias se arma con `shuffle` + `subList(0, 3)` | Garantiza 3 palabras **distintas**; con tres sorteos sueltos podría salir `sol.sol.sol` |
+| `aliases.txt` se lee una sola vez en el constructor | Si falta o está vacío, la app falla al arrancar y no en el primer registro (fail-fast) |
+| `ClassPathResource` en vez de una ruta de disco | Funciona igual desde Eclipse que desde el `.jar` empaquetado |
+| Generar, chequear con `existsBy...` y reintentar (tope de 10) | La constraint `unique` sola daría un error feo; el tope evita un bucle infinito si el espacio se agota |
+| Tests unitarios con Mockito, sin levantar Spring | Corren en milisegundos y prueban la lógica del service aislada de la base |
+| `ArgumentCaptor` para inspeccionar lo que se guarda | Es la única forma de verificar el email normalizado y la contraseña hasheada, que no salen en la respuesta |
 
 ---
 
@@ -351,3 +384,18 @@ Más un **documento de proyecto** con:
 - **Aprendido:** un execution environment de Eclipse es una especificación, no un JDK; sin `@ControllerAdvice`
   el mensaje propio de una validación nunca llega al cliente; un catch-all `Exception` también atrapa
   errores que Spring maneja bien (405/415) y los vuelve 500; guardar con Ctrl+S antes de reiniciar.
+
+### 19/09/2026 — Sesión 5
+
+- **Hecho:** generación de CVU y alias completa — campos en `User`, `aliases.txt`, `AccountDataGenerator`
+  con `SecureRandom`, y `UserService.register` asignando valores únicos con reintento. Primeros tests
+  unitarios del proyecto: `AccountDataGeneratorTest` y `UserServiceTest` con Mockito, 6 en verde.
+- **Trabas:** varios errores de tipeo que Eclipse marcó con mensajes poco obvios (`Build` por `build`,
+  `IOEception`, un método a medio escribir que daba *"Return type for the method is missing"*); y un
+  `cvu: null` en la respuesta aunque el dato estaba en la base, porque `toResponse` seguía con los
+  `null` hardcodeados del paso anterior.
+- **Aprendido:** un método sin tipo de retorno solo es válido si es un constructor con el nombre de la
+  clase; `Collections` (utilidades) no es `Collection` (interfaz); `@Mock` devuelve `false`/`null` por
+  defecto, así que solo hay que stubbear lo que el código realmente usa (si no, Mockito falla por
+  *stubbing* innecesario); y cuando un dato se guarda bien pero vuelve `null`, el problema está en el
+  mapeo a DTO, no en la entidad.

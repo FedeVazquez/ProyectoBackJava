@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
 	
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex){
-		return Build(HttpStatus.BAD_REQUEST, "El cuerpo de la peticion falta o no es un JSON valido",
+		return build(HttpStatus.BAD_REQUEST, "El cuerpo de la peticion falta o no es un JSON valido",
 				Map.of());
 	}
 	

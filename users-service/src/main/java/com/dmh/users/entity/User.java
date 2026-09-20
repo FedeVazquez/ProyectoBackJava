@@ -40,5 +40,11 @@ public class User {
 
 	@Column(nullable = false)
 	private String password;
+	
+	@Column(nullable = false, unique = true, length = 22)
+	private String cvu;
+	
+	@Column(nullable = false, unique = true, length = 100)
+	private String alias;
 
 }
