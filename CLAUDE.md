@@ -26,6 +26,17 @@ Sé razonar sobre arquitectura y lógica. Lo que no tengo fresco es:
 te lo pida explícitamente en ese mensaje. El código lo tipeo yo: es la parte que me hace
 recuperar la memoria muscular.
 
+**Excepción: tareas mecánicas.** Limpiar imports sin usar, renombrar, corregir tipeos en
+nombres o mensajes, ajustar formato y actualizar los `.md` (`docs/CONTEXTO.md`, este archivo)
+los podés hacer vos directamente cuando te lo pida, aunque no diga "hacelo vos". Después
+corré los tests y mostrame qué cambiaste. No commitees salvo que te lo pida.
+Si no está claro si algo es mecánico o lógica nueva, preguntame antes.
+
+**Existe `docs/aprendizaje/`**, un archivo por tema con los conceptos explicados en criollo y
+la respuesta de entrevista ya redactada (qué es, qué problema resuelve, cómo se ve en este
+proyecto, cómo lo cuento, repreguntas típicas, dónde me trabé). No es documentación del
+código: es material de estudio para cuando busque trabajo.
+
 **Dame el código completo, listo para copiar a mano.** Para una clase nueva: la clase
 entera con sus imports, campos, anotaciones y la lógica de cada método. Nada de
 esqueletos con `// TODO`. Yo lo tipeo leyéndolo de lo que me pasás, y esa es la parte
@@ -71,3 +82,7 @@ X") antes que tres features juntas.
 Recordame actualizar `docs/CONTEXTO.md`: las casillas del estado actual y tres líneas en la
 bitácora (qué hice, con qué me trabé, qué aprendí). Eso alimenta los informes de entrega y
 las lecciones aprendidas que pide la certificación.
+
+Recordame también sumar a `docs/aprendizaje/` los conceptos nuevos que hayan aparecido en la
+sesión, con el mismo formato de ficha que el resto, y agregar el archivo al índice si es un
+tema nuevo.
