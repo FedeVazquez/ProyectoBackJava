@@ -73,8 +73,10 @@ X") antes que tres features juntas.
 - Estructura de paquetes: `com.dmh.<servicio>.{entity,repository,service,controller,dto,config,exception}`
 - Un `pom.xml` independiente por microservicio. **No** proponer un proyecto multi-módulo
   con pom padre: los builds tienen que quedar independientes.
-- **No agregar `spring-boot-starter-security`** todavía. Para hashear contraseñas alcanza
-  con `spring-security-crypto`. El starter completo se suma recién cuando implementemos el JWT.
+- **Spring Security ya está** (`spring-boot-starter-security`, sumado al arrancar el login).
+  La configuración vive en `com.dmh.users.config.SecurityConfig`: cadena stateless, CSRF
+  deshabilitado y rutas públicas declaradas una por una. Todo endpoint nuevo que tenga que ser
+  público hay que abrirlo ahí; si no, responde 401/403 sin llegar al controller.
 - DTOs separados de las entidades siempre. La entidad no se expone nunca por HTTP.
 
 ## Al cerrar una sesión de trabajo
