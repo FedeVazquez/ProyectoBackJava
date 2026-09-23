@@ -8,7 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.aopalliance.intercept.Invocation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +21,6 @@ import com.dmh.users.dto.UserResponse;
 import com.dmh.users.entity.User;
 import com.dmh.users.exception.UserAlreadyExistsException;
 import com.dmh.users.repository.UserRepository;
-import com.sun.jdi.request.InvalidRequestStateException;
 
 
 @ExtendWith(MockitoExtension.class)

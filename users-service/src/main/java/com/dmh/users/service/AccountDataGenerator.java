@@ -1,6 +1,5 @@
 package com.dmh.users.service;
 
-import java.awt.geom.Line2D;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 
@@ -20,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AccountDataGenerator {
 
-	private static final int CVU_LENGHT = 22;
+	private static final int CVU_LENGTH = 22;
 	private static final int ALIAS_WORDS = 3;
 	
 	private final SecureRandom random = new SecureRandom();
@@ -31,17 +29,17 @@ public class AccountDataGenerator {
 	}
 	
 	public String generateCvu() {
-		StringBuilder cvu = new StringBuilder(CVU_LENGHT);
-		for(int i = 0; i < CVU_LENGHT; i++) {
+		StringBuilder cvu = new StringBuilder(CVU_LENGTH);
+		for(int i = 0; i < CVU_LENGTH; i++) {
 			cvu.append(random.nextInt(10));
 		}
 		return cvu.toString();
 	}
 	
 	public String generateAlias() {
-		List<String> shufled = new ArrayList<>(words);
-		Collections.shuffle(shufled, random);
-		return String.join(".", shufled.subList(0, ALIAS_WORDS));	
+		List<String> shuffled = new ArrayList<>(words);
+		Collections.shuffle(shuffled, random);
+		return String.join(".", shuffled.subList(0, ALIAS_WORDS));	
 	}
 	
 	private List<String> loadWords(){

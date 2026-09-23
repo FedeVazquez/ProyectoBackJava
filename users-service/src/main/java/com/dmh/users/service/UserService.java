@@ -1,7 +1,5 @@
 package com.dmh.users.service;
 
-import java.util.Iterator;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,7 +56,7 @@ public class UserService {
 				return cvu;
 			}
 		}
-		throw new IllegalStateException("Nose pudo generar un CVU unico");
+		throw new IllegalStateException("No se pudo generar un CVU único");
 	}
 	
 	
@@ -69,7 +67,7 @@ public class UserService {
 				return alias;
 			}
 		}
-		throw new IllegalStateException("Nose pudo generar alias unico");
+		throw new IllegalStateException("No se pudo generar un alias único");
 	}
 
 	private UserResponse toResponse(User user) {
