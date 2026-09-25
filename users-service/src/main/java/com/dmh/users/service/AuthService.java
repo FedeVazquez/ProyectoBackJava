@@ -19,6 +19,7 @@ public class AuthService {
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final JwtService jwtService;
 
 	@Transactional(readOnly = true)
 	public LoginResponse login(LoginRequest request) {
@@ -31,6 +32,6 @@ public class AuthService {
 			throw new InvalidCredentialsException("La contraseña es incorrecta");
 		}
 
-		return new LoginResponse("token-provisorio-para-" + user.getEmail());
+		return new LoginResponse(jwtService.generateToken(user.getEmail()));
 	}
 }

@@ -3,7 +3,7 @@
 Desafío profesional de la especialización Back-End de Digital House.
 Documento vivo: se actualiza al cerrar cada sesión de trabajo.
 
-**Última actualización:** 19/09/2026 (sesión 5)
+**Última actualización:** 25/09/2026 (sesión 7, cierre)
 
 ---
 
@@ -184,17 +184,68 @@ Todo esto se configura una vez por máquina; no viaja con el repo.
 - [x] `AccountDataGenerator` (`@Component`): CVU de 22 dígitos con `SecureRandom`; alias de 3 palabras distintas (`shuffle` + `subList`); el TXT se lee una sola vez al arrancar
 - [x] `UserService.register` asigna CVU y alias únicos (genera, chequea contra la base y reintenta, con tope de 10)
 - [x] `POST /users` devuelve `cvu` de 22 dígitos y `alias` de 3 palabras (verificado en Postman)
-- [x] Tests unitarios en verde: `AccountDataGeneratorTest` (3) y `UserServiceTest` con Mockito (3)
+- [x] Tests unitarios en verde: `AccountDataGeneratorTest` (3, el del alias con `@RepeatedTest(50)`) y `UserServiceTest` con Mockito (3)
+- [x] `spring-boot-starter-security` (reemplazó a `spring-security-crypto`, que ya viene adentro)
+- [x] `SecurityConfig` con `SecurityFilterChain`: cadena stateless, CSRF deshabilitado, y abiertos
+      `POST /users`, `POST /auth/login` y `/error`. Todo lo demás exige autenticación
+- [x] `docs/aprendizaje/`: 7 fichas de conceptos con su índice (material de estudio, no del código)
+- [x] `UserNotFoundException` (404) e `InvalidCredentialsException` (400), enganchadas en el handler
+- [x] `LoginRequest` (email + contraseña con validaciones) y `LoginResponse` (record con `token`)
+- [x] `AuthService.login`: normaliza el email, busca con `findByEmail` (404 si no está) y compara
+      con `passwordEncoder.matches` (400 si no coincide). `@Transactional(readOnly = true)`
+- [x] `AuthController` → `POST /auth/login`
+- [x] **JWT parte 1:** `jjwt` 0.12.6 (`api` + `impl` y `jackson` en `runtime`) en el `pom.xml`;
+      `jwt.secret` (con `${JWT_SECRET:...}`) y `jwt.expiration-ms=3600000` en `application.properties`
+- [x] **JWT parte 2:** `JwtService` (`generateToken`, `extractEmail`, `isValid`, `parseClaims`) y
+      `AuthService` devolviendo el JWT real en lugar del string provisorio
 
 ### En curso — Sprint 1
 
-- [ ] **Login (JWT) y logout** (ver "Próximo paso" abajo)
+- [ ] **Probar el login con JWT en Postman** (pendiente: el código está escrito y compila, pero
+      todavía no se hizo un login de punta a punta)
+- [ ] **JWT parte 3: el `JwtAuthenticationFilter`** (ver "Próximo paso" abajo)
+- [ ] Logout
+- [ ] Tests del `AuthService` (es la única clase de lógica sin tests)
 
 ### Próximo paso concreto
 
-**Login y logout con JWT.** Es el paso donde recién se suma `spring-boot-starter-security`
-(hasta ahora solo estaba `spring-security-crypto` para BCrypt) más una librería de JWT.
-Conviene partirlo en pasos chicos y verificables, no de una sola vez.
+**1. Verificar la parte 2** (5 minutos). Levantar la app y hacer `POST http://localhost:8081/auth/login`
+con un usuario ya registrado:
+
+```json
+{ "email": "fede2@mail.com", "password": "clave1234" }
+```
+
+| Prueba | Esperado |
+|---|---|
+| Credenciales correctas | 200 con `{"token": "eyJ..."}`: tres bloques separados por puntos |
+| Contraseña incorrecta | 400 |
+| Email inexistente | 404 |
+
+El token se puede pegar en jwt.io para ver el payload: `sub` con el email, `iat` y `exp` en
+segundos. Que se lea sin la clave es lo esperado — un JWT garantiza integridad, no secreto.
+
+**2. `JwtAuthenticationFilter`** (`com.dmh.users.config` o un paquete `security`), extendiendo
+`OncePerRequestFilter`:
+
+- Lee el header `Authorization`; si no está o no empieza con `Bearer `, deja pasar el request sin
+  autenticar (de eso se encargan las reglas de `authorizeHttpRequests`)
+- Si está, corta el prefijo `Bearer `, valida con `jwtService.isValid(...)` y saca el email con
+  `extractEmail(...)`
+- Arma un `UsernamePasswordAuthenticationToken` y lo pone en el `SecurityContextHolder`
+- Se enchufa en `SecurityConfig` con
+  `.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)`
+
+**Verificación:** `GET http://localhost:8081/users` sin token → 401/403; con el header
+`Authorization: Bearer <token>` → ya no rebota por autenticación (falta el endpoint, así que
+dará 404/405: eso igual prueba que el filtro autenticó).
+
+**Detalle a decidir en el camino:** hoy no existe ningún endpoint protegido de verdad para probar.
+Puede servir agregar un `GET /users/me` que devuelva los datos del usuario del token.
+
+**Después del JWT: el logout.** Con JWT el servidor no guarda sesión, así que "cerrar sesión" no
+existe por sí solo: hay que elegir una estrategia (lista de tokens revocados, por ejemplo). La
+consigna solo pide que responda 200.
 
 Requisitos de la consigna:
 
@@ -203,10 +254,7 @@ Requisitos de la consigna:
 | Login | email, contraseña | JSON con el token | 404 usuario inexistente, 400 contraseña incorrecta, 500 |
 | Logout | token en el header | — | 200, 500 |
 
-- La contraseña se verifica con `passwordEncoder.matches(plana, hash)`; nunca se compara texto plano
 - El token tiene que sobrevivir a un refresh de la página (no desloguear)
-- Al sumar el starter de Security, `POST /users` queda bloqueado si no se abre explícitamente
-  en `SecurityConfig`: es el primer síntoma esperable
 
 ### Contrato de errores del registro (ya implementado)
 
@@ -225,7 +273,12 @@ un 415 (Content-Type incorrecto) en 500. Se corrige más adelante extendiendo
 
 ### Después
 
-- [ ] Tests de integración con RestAssured sobre `POST /users` (hoy los tests son solo unitarios)
+- [ ] Tests unitarios del `AuthService` con Mockito: usuario inexistente, contraseña incorrecta, login OK
+- [ ] Tests de integración con RestAssured sobre `POST /users` y `POST /auth/login` (hoy los tests son solo unitarios)
+- [ ] Base separada para los tests (`application-test.properties` con H2 en memoria): hoy
+      `UsersServiceApplicationTests` levanta Spring con el properties normal y usa la base de
+      desarrollo, así que los tests de integración se pisarían con los datos hechos a mano
+- [ ] Ampliar `docs/aprendizaje/05-seguridad.md` con el filtro y el logout; escribir `07-microservicios.md`
 - [ ] Pasar de H2 a MySQL (`dmh_users`)
 - [ ] Eureka + Gateway, y separar `accounts-service` (CVU/alias viven ahí, se piden por Feign)
 
@@ -322,6 +375,11 @@ Más un **documento de proyecto** con:
 | Límites de texto definidos en la entidad y repetidos en el DTO | Si solo están en la base, un dato largo da 500; con `@Size` da 400 con mensaje |
 | `show-sql=true` mientras se aprende | Ver el SQL que genera el ORM es la mejor forma de entender qué hace por detrás |
 | GitHub para trabajar, GitLab para entregar | Git maneja varios remotos: `git remote add gitlab <url>` y `git push gitlab main` al momento de la entrega |
+| 404 si el email no existe y 400 si la contraseña es incorrecta | Lo pide la consigna. En producción se devolvería lo mismo en ambos casos, para no confirmar qué emails están registrados |
+| `jjwt` separado en `api` / `impl` / `jackson`, con `impl` y `jackson` en `runtime` | Se programa solo contra la API; si se usa una clase interna de la implementación por error, no compila |
+| Clave JWT vía `${JWT_SECRET:<default de desarrollo>}` | La app arranca recién clonada sin configurar nada, y en producción la variable de entorno pisa el valor. La clave real nunca va al repo |
+| Vencimiento del token: 1 hora | Equilibrio entre molestar al usuario y limitar la ventana útil de un token robado |
+| El `JwtService` arma la `SecretKey` una sola vez, en el constructor | Evita rehacer trabajo criptográfico en cada token, y una clave corta falla al arrancar y no en el primer login |
 | `ErrorResponse` como `record` con `status`, `message` y `errors` | Un solo formato de error para toda la API; el record es inmutable y no necesita Lombok |
 | `errors` como mapa `campo → mensaje`, con `toMap` y función de merge | Un campo con dos violaciones repite la clave y `toMap` sin merge lanza `IllegalStateException` |
 | Handler propio de `HttpMessageNotReadableException` | Con un catch-all `Exception`, un body vacío o un JSON roto pasaría de 400 a 500 |
@@ -399,3 +457,40 @@ Más un **documento de proyecto** con:
   defecto, así que solo hay que stubbear lo que el código realmente usa (si no, Mockito falla por
   *stubbing* innecesario); y cuando un dato se guarda bien pero vuelve `null`, el problema está en el
   mapeo a DTO, no en la entidad.
+
+### 22–23/09/2026 — Sesión 6
+
+- **Hecho:** `spring-boot-starter-security` con `SecurityConfig` (cadena stateless, CSRF off,
+  rutas públicas declaradas una por una) y `POST /auth/login` funcionando contra la base, con
+  404 y 400 según el caso. El token todavía es provisorio. Se creó `docs/aprendizaje/` con 7
+  fichas de conceptos para estudiar y para explicar en entrevistas.
+- **Trabas:** al sumar el starter, todos los endpoints pasaron a responder 401 hasta declarar
+  las rutas públicas en la cadena de filtros.
+- **Aprendido:** Security actúa como una cadena de filtros **antes** del controller, así que un
+  401/403 no llega nunca al código propio; las reglas de `authorizeHttpRequests` se evalúan en
+  orden y gana la primera que coincide.
+
+### 25/09/2026 — Sesión 7
+
+- **Hecho:** sincronizadas las dos PCs (la del trabajo había quedado atrás), limpieza de imports
+  y tipeos, y el test del alias ahora verifica que las tres palabras sean distintas, con
+  `@RepeatedTest(50)`. Documento puesto al día. Arranca el JWT.
+- **Trabas:** la copia del trabajo tenía cambios sin commitear que eran versiones viejas de lo
+  ya pusheado desde casa; se resolvió con `git stash` antes del `pull`.
+- **Aprendido:** `Set.of(...)` lanza excepción con elementos repetidos en vez de descartarlos,
+  así que para contar distintos va `new HashSet<>(List.of(...))`; y trabajar en dos máquinas
+  exige commitear y pushear antes de cambiar de lugar.
+
+### 25/09/2026 — Sesión 7 (cierre)
+
+- **Hecho:** JWT partes 1 y 2 — `jjwt` 0.12.6, la clave por variable de entorno con default de
+  desarrollo, `JwtService` completo y `AuthService` devolviendo el token real. Documentación al
+  día, incluida la ficha de seguridad con JWT.
+- **Trabas:** `openssl` no existe en PowerShell (sí en Git Bash); la clave generada se pegó en un
+  chat, así que hubo que descartarla y generar otra.
+- **Aprendido:** un JWT no oculta nada, solo garantiza integridad: header y payload son Base64
+  legible y la firma es lo que impide modificarlos. La API de `jjwt` cambió en 0.12, así que los
+  tutoriales con `.setSubject(...)` ya no compilan.
+
+> **Queda pendiente de probar:** el login con JWT nunca se ejecutó de punta a punta. Antes de
+> seguir con el filtro, hacer la verificación 1 del "Próximo paso".

@@ -139,3 +139,94 @@ ocultan el problema real.
 **Cómo lo cuento en 30 segundos:** "Dejo `/error` como público. Si no, un 404 o un error
 cualquiera vuelve como error de autenticación y te manda a investigar permisos cuando el
 problema es otro."
+
+---
+
+## Qué es un JWT
+
+**En una frase:** es un string firmado que el servidor emite en el login y el cliente devuelve en
+cada request para decir quién es.
+
+**Las tres partes:** `header.payload.firma`, separadas por puntos.
+
+| Parte | Qué lleva |
+|---|---|
+| Header | El algoritmo de firma (acá HS256) |
+| Payload | Los datos ("claims"): en este proyecto `sub` (el email), `iat` (emitido) y `exp` (vence) |
+| Firma | El resultado de firmar header y payload con la clave secreta del servidor |
+
+**Lo que más se malinterpreta:** el header y el payload están en **Base64, no encriptados**.
+Cualquiera que tenga el token puede leerlos, por ejemplo pegándolo en jwt.io. Lo que el JWT
+garantiza no es secreto, es **integridad**: sin la clave, nadie puede fabricar un token válido
+ni modificar uno existente, porque la firma deja de coincidir.
+
+**Cómo lo cuento en 30 segundos:** "En el login valido las credenciales y emito un JWT firmado
+con una clave del servidor. El cliente lo manda en el header `Authorization` en cada request, y
+el servidor solo verifica la firma y el vencimiento: no consulta la base ni guarda sesión. El
+payload es legible, así que no pongo nada sensible adentro."
+
+**Repreguntas típicas:**
+- *¿Por qué no guardar la contraseña o datos personales en el payload?* Porque cualquiera lo
+  puede leer. Solo va un identificador y las fechas.
+- *¿Entonces para qué sirve la firma?* Para que nadie pueda cambiar el `sub` por el email de otro
+  usuario: al modificar el payload, la firma deja de validar.
+- *¿Qué pasa si roban el token?* Sirve hasta que venza. Por eso los vencimientos son cortos y
+  existen los refresh tokens.
+- *¿HS256 o RS256?* HS256 usa **una sola clave** para firmar y verificar: alcanza cuando el mismo
+  sistema hace las dos cosas. RS256 usa clave privada para firmar y pública para verificar, que
+  es lo que conviene cuando varios servicios tienen que validar tokens que no emitieron.
+
+---
+
+## El `JwtService` de este proyecto
+
+```java
+public JwtService(@Value("${jwt.secret}") String secret,
+		@Value("${jwt.expiration-ms}") long expirationMs) {
+	this.key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret));
+	this.expirationMs = expirationMs;
+}
+```
+
+**Decisiones que hay detrás:**
+
+- **La clave se arma una sola vez, en el constructor.** Convertir el texto en un objeto
+  criptográfico en cada token sería trabajo repetido al pedo.
+- **`Keys.hmacShaKeyFor` falla al arrancar si la clave es corta** (`WeakKeyException`). HS256
+  exige 256 bits. El error aparece en el arranque y no en el primer login: fail-fast.
+- **El constructor va escrito a mano, sin `@RequiredArgsConstructor`.** Lombok no puede poner
+  anotaciones (`@Value`) en los parámetros que genera.
+- **Validar es parsear.** `parseSignedClaims` verifica la firma y el vencimiento, y **lanza una
+  excepción** si algo está mal; no devuelve `null`. `isValid` es un envoltorio con `try/catch`
+  sobre `JwtException` (de la que heredan firma inválida, token vencido y formato roto) y
+  `IllegalArgumentException` (token nulo o vacío).
+
+**Dónde me trabé:** la API de `jjwt` cambió en la versión 0.12. Ahora es `.subject(...)`,
+`.issuedAt(...)`, `.expiration(...)` y `Jwts.parser().verifyWith(key)`. Los tutoriales viejos
+usan `.setSubject(...)` y `parserBuilder().setSigningKey(...)`, que ya no compilan.
+
+---
+
+## La clave secreta: dónde vive
+
+**En una frase:** el código va a Git, los secretos no.
+
+**En este proyecto:**
+```properties
+jwt.secret=${JWT_SECRET:<clave de desarrollo>}
+```
+
+Spring resuelve `${VARIABLE:valorPorDefecto}`: si existe la variable de entorno la usa, y si no,
+cae en el valor por defecto. Así la app arranca sin configuración en desarrollo, y en producción
+la variable de entorno pisa ese valor.
+
+**Cómo lo cuento en 30 segundos:** "La clave de firma se lee de una variable de entorno, con un
+valor por defecto de desarrollo para que el proyecto arranque recién clonado. La clave real nunca
+está en el repositorio: si se filtra, cualquiera puede emitir tokens válidos y hacerse pasar por
+cualquier usuario."
+
+**Repreguntas típicas:**
+- *¿Y si ya se commiteó una clave?* No alcanza con borrarla: queda en el historial de Git. Hay
+  que **rotarla**, o sea generar una nueva y dar la vieja por comprometida.
+- *¿Qué pasa cuando rotás la clave?* Todos los tokens emitidos dejan de validar y los usuarios
+  tienen que volver a loguearse.

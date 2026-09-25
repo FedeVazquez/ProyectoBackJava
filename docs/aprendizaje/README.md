@@ -19,14 +19,14 @@ las diría yo.
 | [02-jpa-hibernate.md](02-jpa-hibernate.md) | ORM, entidades, repositorios, `ddl-auto`, transacciones |
 | [03-dto-validaciones.md](03-dto-validaciones.md) | Por qué DTOs, `@Valid`, dónde van los límites de datos |
 | [04-errores-http.md](04-errores-http.md) | Códigos de estado, `@RestControllerAdvice`, contrato de error |
-| [05-seguridad.md](05-seguridad.md) | Hash de contraseñas, BCrypt, la cadena de filtros, CSRF, JWT |
+| [05-seguridad.md](05-seguridad.md) | Hash de contraseñas, BCrypt, la cadena de filtros, CSRF, stateless, JWT, la clave secreta |
 | [06-testing.md](06-testing.md) | Unitario vs integración, mocks, qué se testea y qué no |
 | [08-herramientas.md](08-herramientas.md) | Maven, Lombok, JDK, Eclipse, Git |
 
 Pendientes de escribir, cuando lleguemos a esa parte del proyecto:
 
 - `07-microservicios.md` — por qué separar servicios, Eureka, Gateway, Feign
-- Ampliar `05-seguridad.md` con JWT cuando esté implementado
+- Ampliar `05-seguridad.md` con el filtro de autenticación y el logout, cuando estén probados
 
 ---
 
